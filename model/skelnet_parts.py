@@ -32,8 +32,11 @@ class SingleConv(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size=3):
         super().__init__()
+
+        padding = 0 if kernel_size == 1 else 1
+
         self.single_conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=1),
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
         )
@@ -48,18 +51,10 @@ class QuadConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3):
         super().__init__()
         self.quad_conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True),
+            SingleConv(in_channels, out_channels, kernel_size),
+            SingleConv(out_channels, out_channels, kernel_size),
+            SingleConv(out_channels, out_channels, kernel_size),
+            SingleConv(out_channels, out_channels, kernel_size),
         )
 
     def forward(self, x):
@@ -74,7 +69,8 @@ class Down(nn.Module):
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
             #DoubleConv(in_channels, out_channels, None, kernel_size)
-            SingleConv(in_channels, out_channels, kernel_size)
+            #SingleConv(in_channels, out_channels, kernel_size)
+            BasicBlock(in_channels, out_channels)
         )
 
     def forward(self, x):
@@ -84,7 +80,7 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(self, in_channels, out_channels, bilinear=True):
+    def __init__(self, in_channels, out_channels, bilinear=False):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
@@ -93,8 +89,10 @@ class Up(nn.Module):
             self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
         else:
             self.up = nn.ConvTranspose2d(in_channels , in_channels // 2, kernel_size=2, stride=2)
+            self.resblock = BasicBlock(in_channels, out_channels)
+
             #self.conv = DoubleConv(in_channels, out_channels)
-            self.conv = SingleConv(in_channels, out_channels)
+            #self.conv = SingleConv(in_channels, out_channels)
             #self.conv = QuadConv(in_channels, out_channels)
 
     def forward(self, x1, x2):
@@ -109,13 +107,44 @@ class Up(nn.Module):
         # https://github.com/HaiyongJiang/U-Net-Pytorch-Unstructured-Buggy/commit/0e854509c2cea854e247a9c615f175f76fbb2e3a
         # https://github.com/xiaopeng-liao/Pytorch-UNet/commit/8ebac70e633bac59fc22bb5195e513d5832fb3bd
         x = torch.cat([x2, x1], dim=1)
-        return self.conv(x)
+
+        #return self.conv(x)
+        return self.resblock(x)
 
 
 class OutConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(OutConv, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1)
 
     def forward(self, x):
         return self.conv(x)
+
+
+# https://github.com/trailingend/pytorch-residual-block/blob/master/main.py
+class BasicBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(BasicBlock, self).__init__()
+
+        self.conv_res = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+
+        self.conv_block1 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(),
+        ) 
+        self.conv_block2 = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(), # agregado
+        )
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        #residual = x
+        residual = self.conv_res(x)
+        x = self.conv_block1(x)
+        x = self.conv_block2(x)
+        x = x + residual
+        out = self.relu(x)
+        return out
