@@ -1,2 +1,5 @@
 model/.ipynb_checkpoints/
 model/__pycache__/
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
