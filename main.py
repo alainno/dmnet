@@ -4,4 +4,4 @@ from torchsummary import summary
 net = SkelNet(1, 1, False)
 
 #print(net)
-summary(net, (1,256,256))
+summary(net, (1,256,256), depth = 99)
