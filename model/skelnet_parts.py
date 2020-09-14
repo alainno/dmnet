@@ -66,12 +66,18 @@ class Down(nn.Module):
 
     def __init__(self, in_channels, out_channels, kernel_size=3):
         super().__init__()
-        self.maxpool_conv = nn.Sequential(
-            nn.MaxPool2d(2),
-            #DoubleConv(in_channels, out_channels, None, kernel_size)
-            SingleConv(in_channels, out_channels, kernel_size),
-            BasicBlock(out_channels, out_channels),
-        )
+        if kernel_size==1:
+            self.maxpool_conv = nn.Sequential(
+                nn.MaxPool2d(2),
+                DoubleConv(in_channels, out_channels, None, kernel_size)
+            )
+        else:
+            self.maxpool_conv = nn.Sequential(
+                nn.MaxPool2d(2),
+                #DoubleConv(in_channels, out_channels, None, kernel_size)
+                SingleConv(in_channels, out_channels, kernel_size),
+                BasicBlock(out_channels, out_channels),
+            )
 
     def forward(self, x):
         return self.maxpool_conv(x)
