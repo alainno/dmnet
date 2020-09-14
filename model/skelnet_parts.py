@@ -69,8 +69,8 @@ class Down(nn.Module):
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
             #DoubleConv(in_channels, out_channels, None, kernel_size)
-            #SingleConv(in_channels, out_channels, kernel_size)
-            BasicBlock(in_channels, out_channels)
+            SingleConv(in_channels, out_channels, kernel_size),
+            BasicBlock(out_channels, out_channels),
         )
 
     def forward(self, x):
@@ -89,11 +89,10 @@ class Up(nn.Module):
             self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
         else:
             self.up = nn.ConvTranspose2d(in_channels , in_channels // 2, kernel_size=2, stride=2)
-            self.resblock = BasicBlock(in_channels, out_channels)
-
             #self.conv = DoubleConv(in_channels, out_channels)
-            #self.conv = SingleConv(in_channels, out_channels)
+            self.conv = SingleConv(in_channels, out_channels)
             #self.conv = QuadConv(in_channels, out_channels)
+            #self.resblock = BasicBlock(in_channels, out_channels)
 
     def forward(self, x1, x2):
         x1 = self.up(x1)
@@ -108,8 +107,8 @@ class Up(nn.Module):
         # https://github.com/xiaopeng-liao/Pytorch-UNet/commit/8ebac70e633bac59fc22bb5195e513d5832fb3bd
         x = torch.cat([x2, x1], dim=1)
 
-        #return self.conv(x)
-        return self.resblock(x)
+        return self.conv(x)
+        #return self.resblock(x)
 
 
 class OutConv(nn.Module):
@@ -136,15 +135,21 @@ class BasicBlock(nn.Module):
         self.conv_block2 = nn.Sequential(
             nn.Conv2d(out_channels, out_channels, 3, padding=1),
             nn.BatchNorm2d(out_channels),
-            nn.ReLU(), # agregado
+            #nn.ReLU(), # agregado
         )
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        #residual = x
-        residual = self.conv_res(x)
-        x = self.conv_block1(x)
-        x = self.conv_block2(x)
-        x = x + residual
-        out = self.relu(x)
+        identity  = x
+        out = self.conv_block1(x)
+        out = self.conv_block2(out)
+        out += identity
+        out = self.relu(out)
         return out
+
+        #residual = self.conv_res(x)
+        #x = self.conv_block1(x)
+        #x = self.conv_block2(x)
+        #x = x + residual
+        #out = self.relu(x)
+        #return out

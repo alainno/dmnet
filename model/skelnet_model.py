@@ -13,7 +13,11 @@ class SkelNet(nn.Module):
 
         #self.inc = DoubleConv(n_channels, 32)
         #self.inc = SingleConv(n_channels, 32)
-        self.inc = BasicBlock(n_channels, 32)
+        #self.inc = BasicBlock(n_channels, 32)
+        self.inc = nn.Sequential(
+            SingleConv(n_channels, 32),
+            BasicBlock(32, 32),
+        )
         self.down0 = Down(32, 64)
         self.down1 = Down(64, 128)
         self.down2 = Down(128, 256)
