@@ -159,3 +159,14 @@ class BasicBlock(nn.Module):
         #x = x + residual
         #out = self.relu(x)
         #return out
+
+class ResConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(ResConv, self).__init__()
+        self.conv = nn.Sequential(
+            SingleConv(in_channels, out_channels),
+            BasicBlock(out_channels, out_channels),
+        )
+        
+    def forward(self, x):
+        return self.conv(x)

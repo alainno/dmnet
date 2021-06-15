@@ -1,3 +1,7 @@
 .ipynb_checkpoints/
 __pycache__/
 *.pyc
+model/.ipynb_checkpoints/
+*.pth
+model/__pycache__/
+data/
