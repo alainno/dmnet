@@ -73,7 +73,10 @@ class HedNet(nn.Module):
         fuse = torch.cat((upsample1, upsample2, upsample3, upsample4), dim=1)
         fuse = self.dilation(fuse)
         
-        results = [upsample1, upsample2, upsample3, upsample4, fuse]
+        ensembled = upsample2 * 0.2
+        ensembled = ensembled.add(fuse * 0.8)
+        
+        results = [upsample1, upsample2, upsample3, upsample4, fuse, ensembled]
         #results = [torch.sigmoid(r) for r in results]
         return results
         
