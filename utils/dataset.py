@@ -6,10 +6,10 @@ import torch
 from torch.utils.data import Dataset
 import logging
 from PIL import Image
-
+import h5py
 
 class BasicDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir, scale=1, mask_suffix='', transforms=None):
+    def __init__(self, imgs_dir, masks_dir, scale=1, mask_suffix='', transforms=None, mask_h5=False):
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         self.scale = scale
@@ -20,24 +20,28 @@ class BasicDataset(Dataset):
                     if not file.startswith('.')]
         logging.info(f'Creating dataset with {len(self.ids)} examples')
         
-        # agregado
+        # agregados
         self.transforms = transforms
+        self.mask_h5 = mask_h5
 
     def __len__(self):
         return len(self.ids)
 
     @classmethod
-    def preprocess(cls, pil_img, scale, debug=False):
+    def preprocess(cls, pil_img, scale, debug=False, mask_h5=False):
         
-        w, h = pil_img.size
-        newW, newH = int(scale * w), int(scale * h)
-        assert newW > 0 and newH > 0, 'Scale is too small'
-        pil_img = pil_img.resize((newW, newH))
+        if mask_h5:
+            img_nd = pil_img
+        else:
+            w, h = pil_img.size
+            newW, newH = int(scale * w), int(scale * h)
+            assert newW > 0 and newH > 0, 'Scale is too small'
+            pil_img = pil_img.resize((newW, newH))
 
-        if(debug):
-            print('pil_img.mode', pil_img.mode)
-        
-        img_nd = np.array(pil_img)
+            if(debug):
+                print('pil_img.mode', pil_img.mode)
+
+            img_nd = np.array(pil_img)
         
         if(debug):
             print('img_nd.shape', img_nd.shape)
@@ -48,8 +52,8 @@ class BasicDataset(Dataset):
         # HWC to CHW
         img_trans = img_nd.transpose((2, 0, 1))
         
-        if img_trans.max() > 1:
-            img_trans = img_trans / 255
+        #if img_trans.max() > 1:
+        #    img_trans = img_trans / 255
             
         return img_trans
 
@@ -62,21 +66,29 @@ class BasicDataset(Dataset):
             f'Either no mask or multiple masks found for the ID {idx}: {mask_file}'
         assert len(img_file) == 1, \
             f'Either no image or multiple images found for the ID {idx}: {img_file}'
-        mask = Image.open(mask_file[0]).convert('L')
+        
+        if self.mask_h5:
+            mask_h5_data = h5py.File(mask_file[0], 'r')
+            mask = np.asarray(mask_h5_data['dm'])
+            mask_size = mask.shape[::-1]
+        else:
+            mask = Image.open(mask_file[0]) #.convert('L')
+            mask_size = mask.size
+        
         img = Image.open(img_file[0])
 
-        assert img.size == mask.size, \
+        assert img.size == mask_size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
+        
+        #img = self.preprocess(img, self.scale)
+        mask = self.preprocess(mask, self.scale, mask_h5=self.mask_h5)
         
         if self.transforms is not None:
             img = self.transforms(img)
-            mask = self.transforms(mask)
-        
-        img = self.preprocess(img, self.scale)
-        mask = self.preprocess(mask, self.scale)
+        #    mask = self.transforms(mask)
         
         return {
-            'image': torch.from_numpy(img).type(torch.FloatTensor),
+            'image': img, #torch.from_numpy(img).type(torch.FloatTensor),
             'mask': torch.from_numpy(mask).type(torch.FloatTensor)
         }
 
