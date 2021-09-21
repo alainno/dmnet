@@ -8,6 +8,7 @@ from torchvision import transforms
 from unet import UNet
 import os
 import pandas as pd
+import torch.nn as nn
 
 def get_diameter_count(distance_map):
     '''
@@ -132,3 +133,23 @@ def get_diameters(net, img_path_list):
         diameter_means.append(diameter_mean)
         
     return diameter_means
+
+
+def to_multiple_gpu(net):
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.device_count() > 1:
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        net = nn.DataParallel(net)
+    net.to(device=device)
+
+def get_densities(diameter_count):
+    suma = sum(diameter_count.values())
+    densities = [v/suma for v in diameter_count.values()]
+    return list(diameter_count.keys()),densities
+
+def predict_dm_list(net, batch):
+    with torch.no_grad():
+        output = net(batch['image'])
+    predictions = output.cpu().numpy()
+    dm_list = [predictions[i].squeeze() for i in range(predictions.shape[0])]
+    return dm_list
