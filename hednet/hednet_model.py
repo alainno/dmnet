@@ -6,11 +6,12 @@ from .coordconv import CoordConv1d, CoordConv2d, CoordConv3d
 import numpy as np
 
 class HedNet(nn.Module):
-    def __init__(self, n_channels, n_classes, bilinear=True):
+    def __init__(self, n_channels, n_classes, bilinear=True, side=4):
         super(HedNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.bilinear = bilinear
+        self.side = side
 
         self.coordconv = CoordConv2d(n_channels, 32, 1)
         self.inc = DoubleConv(32, 32)
@@ -78,7 +79,7 @@ class HedNet(nn.Module):
         
         results = [upsample1, upsample2, upsample3, upsample4, fuse, ensembled]
         #results = [torch.sigmoid(r) for r in results]
-        return results
+        return results[self.side]
         
         #return x
         #return fuse
