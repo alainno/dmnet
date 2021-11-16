@@ -17,4 +17,4 @@ Execute the following command: ```python train_all.py```. This command will trai
 Test are run on notebooks:
 
 * Fiber diameter Mean and Std: [test_mean_std.ipynb](test_mean_std.ipynb)
-* Measurement error: [test_measurement_error.ipyb](test_measurement_error.ipyb)
+* Measurement error: [test_measurement_error.ipyb](test_measurement_error.ipynb)
