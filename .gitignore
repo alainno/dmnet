@@ -6,3 +6,6 @@ model/.ipynb_checkpoints/
 model/__pycache__/
 data/
 data_dm_overlapping/
+tmp/
+checkpoints/
+resultados/

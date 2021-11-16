@@ -141,4 +141,23 @@ class OutConv(nn.Module):
 
     def forward(self, x):
         return self.conv(x)
+
     
+class UpSide(nn.Module):
+    '''
+    Upscaling the side
+    '''
+    def __init__(self, in_channels, out_channels, kernel_size, stride):
+        super().__init__()
+        self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride)
+        
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+        
+        diffY = x2.size()[2] - x1.size()[2]
+        diffX = x2.size()[3] - x1.size()[3]
+
+        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
+                        diffY // 2, diffY - diffY // 2])
+        
+        return x1

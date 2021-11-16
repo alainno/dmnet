@@ -48,7 +48,8 @@ class BasicDataset(Dataset):
         # HWC to CHW
         img_trans = img_nd.transpose((2, 0, 1))
         
-        if normalize and img_trans.max() > 1:
+        #if normalize and img_trans.max() > 1:
+        if img_trans.max() > 1:
             img_trans = img_trans / 255
             
         return img_trans
@@ -66,22 +67,23 @@ class BasicDataset(Dataset):
         mask_h5 = h5py.File(mask_file[0], 'r')
         mask = np.asarray(mask_h5['dm'])
 
-        img = np.array(Image.open(img_file[0]))
+        img = Image.open(img_file[0])
 
         # assert img.size == mask.size, \
         #     f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
-        assert img.shape == mask.shape, \
+        assert img.size[::-1] == mask.shape, \
             f'Image and mask {idx} should be the same size, but are {img.shape} and {mask.shape}'
         
-        # if self.transforms is not None:
-        #     img = self.transforms(img)
-        #     mask = self.transforms(mask)
-        
-        img = self.preprocess(img)
+        #img = self.preprocess(img)
         mask = self.preprocess(mask, normalize=False)
         
+        
+        if self.transforms is not None:
+            img = self.transforms(img)
+        #     mask = self.transforms(mask)
+        
         return {
-            'image': torch.from_numpy(img).type(torch.FloatTensor),
+            'image': img, # torch.from_numpy(img).type(torch.FloatTensor),
             'mask': torch.from_numpy(mask).type(torch.FloatTensor)
         }
 

@@ -7,7 +7,7 @@ import torch.nn as nn
 from hednet import HedNet
 from unet import UNet
 from utils.dataset import BasicDataset
-from net_utils import *
+from utils.net_utils import *
 
 from tqdm import tqdm
 import pandas as pd
@@ -100,14 +100,14 @@ def train_net(net, criterion, target='MODEL.pth'):
                 print('Early stopping!')
                 break    
 
-    print(f'The best Loss: {min(val_losses)}')    
-    return best_prec1
+    print(f'The best Loss (train): {min(train_losses)}')                
+    print(f'The best Loss (val): {min(val_losses)}')    
+    return min(train_losses),best_prec1
 
 
 if __name__ == "__main__":
     
-    
-    print(torch.__version__)
+    #print(torch.__version__)
     #sys.exit(0)
     now = datetime.now()
 
@@ -119,8 +119,8 @@ if __name__ == "__main__":
     dir_img = 'data_dm_overlapping/imgs/'
     dir_mask = 'data_dm_overlapping/masks/'
     batch_size = 4
-    lr = 0.0001
-    weight_decay = 5*(10**-7)
+    #lr = 0.0001
+    #weight_decay = 5*(10**-7)
 
     # definiendo el dataset:
     dataset = BasicDataset(dir_img, dir_mask, img_scale, transforms=transforms.Compose([
@@ -143,15 +143,17 @@ if __name__ == "__main__":
     # Training:
     model_list = []
     error_list = []
+    error_train_list = []
     # for test:
     #lote = next(iter(test_loader))
     #img_path_list = lote['path']
     
     
-    criterion = nn.MSELoss()
+    criterion = nn.SmoothL1Loss()
+
     '''
-    print('Training U-Net (MSE)...')
-    model_list.append('U-Net (MSE)')
+    print('Training DIST (baseline)...')
+    model_list.append('DIST (baseline)')
     
     net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=32)
     if torch.cuda.device_count() > 1:
@@ -159,47 +161,47 @@ if __name__ == "__main__":
         net = nn.DataParallel(net)
     net.to(device=device)      
 
-    error = train_net(net, criterion, 'checkpoints/MODEL_unet_mse.pth')
+    lr = 10**-3
+    weight_decay = 5*(10**-6)
+    
+    error = train_net(net, criterion, 'checkpoints/MODEL_dist_baseline.pth')
     error_list.append(error)
-    '''
-    print('Training U-Net (MSE)...')
-    model_list.append('U-Net (MSE)')
-    
-    net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=64)
-    if torch.cuda.device_count() > 1:
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
-        net = nn.DataParallel(net)
-    net.to(device=device)      
-
-    error = train_net(net, criterion, 'checkpoints/MODEL_unet_mse.pth')
-    error_list.append(error)    
-    
-    print('Training SkeletonNet (MSE)...')
-    model_list.append('SkeletonNet (MSE)')
     
     
-    net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4)
+    
+    
+    print('Training SkeletonNet regression (baseline)...')
+    model_list.append('SkeletonNet regression (baseline)')
+    
+    net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=32)
     if torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         net = nn.DataParallel(net)    
     net.to(device=device)
     
-    error = train_net(net, criterion, 'checkpoints/MODEL_snet_mse.pth')
-    error_list.append(error)
+    lr = 10**-3
+    weight_decay = 0
     
-    ########
-    criterion = nn.SmoothL1Loss()
+    error = train_net(net, criterion, 'checkpoints/MODEL_snet_reg_baseline.pth')
+    error_list.append(error)
+    '''
 
-    print('Training U-Net (SmoothL1Loss)...')
-    model_list.append('U-Net (SmoothL1Loss)')
+    
+    
+    print('Training DIST (ours)...')
+    model_list.append('DIST (ours)')
     
     net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=64)
     if torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         net = nn.DataParallel(net)
-    net.to(device=device)      
+    net.to(device=device)
+    
+    lr = 10**-3
+    weight_decay = 5*(10**-6)    
 
-    error = train_net(net, criterion, 'checkpoints/MODEL_unet_sl1.pth')
+    error_train,error = train_net(net, criterion, 'checkpoints/MODEL_dist_ours.pth')
+    error_train_list.append(error_train)
     error_list.append(error)
     
     # test U-Net
@@ -207,60 +209,35 @@ if __name__ == "__main__":
     #net.eval()
     #diameter_means_unet = get_diameters(net, img_path_list)
     
-    print('Training SkeletonNet (SmoothL1Loss)...')
-    model_list.append('SkeletonNet (SmoothL1Loss)')
     
-    net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4)
+    print('Training SkeletonNet regression (ours)...')
+    model_list.append('SkeletonNet regression (ours)')
+    
+    net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=64)
     if torch.cuda.device_count() > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")
         net = nn.DataParallel(net)    
     net.to(device=device)
     
-    error = train_net(net, criterion, 'checkpoints/MODEL_snet_sl1.pth')
+    lr = 10**-4
+    weight_decay = 5*(10**-6)     
+    
+    error_train,error = train_net(net, criterion, 'checkpoints/MODEL_snet_reg_ours.pth')
+    error_train_list.append(error_train)
     error_list.append(error)
+
     
     # test Skeleton
     #net.load_state_dict(torch.load('MODEL.pth'))
     #net.eval()
     #diameter_means_snet = get_diameters(net, img_path_list)
         
-    '''
-    model_list = []
-    mse_list = []
-    
-    lrs = [10**-i for i in range(2,7)]
-    weight_decays = [5*(10**-i) for i in range(3,7)]
-    
-    for lr in lrs:
-        for weight_decay in weight_decays:
-            
-            model_list.append("UNet(lr=" + str(lr) + ",decay=" + str(weight_decay))
 
-            net = UNet(n_channels=3, n_classes=1, bilinear=False)
-            if torch.cuda.device_count() > 1:
-                print("Let's use", torch.cuda.device_count(), "GPUs!")
-                net = nn.DataParallel(net)
-
-            net.to(device=device)
-
-            mse = train_net(net, lr, weight_decay)
-            mse_list.append(mse)
-
-            model_list.append("SkeletonNet(lr=" + str(lr) + ",decay=" + str(weight_decay))
-            #for i in range(5):
-            net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4)
-            if torch.cuda.device_count() > 1:
-                print("Let's use", torch.cuda.device_count(), "GPUs!")
-                net = nn.DataParallel(net)    
-            net.to(device=device)
-
-            mse = train_net(net, lr, weight_decay)
-            mse_list.append(mse)
-            
-            
-    '''
-    dataset = {'Modelo':model_list,#,'SNet 1','SNet 2','SNet 3','SNet 4','SNet 5'],
-              'Loss':error_list}
+    dataset = {
+                'Modelo':model_list,
+                'Min Val Loss':error_list,
+                'Min Train Loss':error_train_list,
+              }
     df = pd.DataFrame(dataset)
     df.to_csv('resultados/losses_'+now.strftime("%Y%m%d%H%M")+'.csv', index=False)
     
