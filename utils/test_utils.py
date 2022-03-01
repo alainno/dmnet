@@ -104,7 +104,7 @@ def batch_from_folder(folder_path):
             tensor = tensor.expand(3, -1, -1)
             tensor_list.append(tensor)    
     
-    tensor_batch = torch.cat([tensor.permute(0,2,1).unsqueeze(0) for tensor in tensor_list])
+    tensor_batch = torch.cat([tensor.unsqueeze(0) for tensor in tensor_list])
     return tensor_batch
 
 
@@ -121,3 +121,28 @@ def gt_ofda_diameter_count(img_path):
         diameter_count[row[1]] = diameter_count.get(row[1], 0) + row[0]
     
     return diameter_count
+
+
+
+def batch_from_list(img_list):
+
+    tensor_list = []
+
+    tf = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.114, 0.114, 0.114],std=[0.237, 0.237, 0.237])
+                ])
+    
+    for img in img_list:
+        pil_img = Image.fromarray(img)
+
+        diffX = 256 - pil_img.size[0]            
+        diffY = 256 - pil_img.size[1]
+        pil_img = add_margin(pil_img, diffY // 2, diffX - diffX//2, diffY - diffY//2, diffX // 2, 0)
+
+        tensor = tf(pil_img)
+        tensor = tensor.expand(3, -1, -1)
+        tensor_list.append(tensor)  
+    
+    tensor_batch = torch.cat([tensor.unsqueeze(0) for tensor in tensor_list])
+    return tensor_batch
