@@ -6,14 +6,14 @@ from .coordconv import CoordConv1d, CoordConv2d, CoordConv3d
 import numpy as np
 
 class HedNet(nn.Module):
-    def __init__(self, n_channels, n_classes, bilinear=True, side=4, n_features=64):
+    def __init__(self, n_channels, n_classes, bilinear=True, side=4, n_features=64, use_cuda=True):
         super(HedNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.bilinear = bilinear
         self.side = side
 
-        self.coordconv = CoordConv2d(n_channels, n_features, 1) # 190x198x64
+        self.coordconv = CoordConv2d(n_channels, n_features, 1, use_cuda=use_cuda) # 190x198x64
         self.inc = DoubleConv(n_features, n_features) # 190x198x64
         self.down1 = Down(n_features, n_features*2) # 95x99x128
         self.down2 = Down(n_features*2, n_features*4) # 47x49x256
