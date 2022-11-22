@@ -187,7 +187,7 @@ if __name__ == "__main__":
     '''
 
     
-    
+    # Train DIST on U-Net
     print('Training DIST (ours)...')
     model_list.append('DIST (ours)')
     
@@ -204,12 +204,9 @@ if __name__ == "__main__":
     error_train_list.append(error_train)
     error_list.append(error)
     
-    # test U-Net
-    #net.load_state_dict(torch.load('MODEL.pth'))
-    #net.eval()
-    #diameter_means_unet = get_diameters(net, img_path_list)
+
     
-    
+    # Train DIST on SkeletonNet
     print('Training SkeletonNet regression (ours)...')
     model_list.append('SkeletonNet regression (ours)')
     
@@ -226,13 +223,9 @@ if __name__ == "__main__":
     error_train_list.append(error_train)
     error_list.append(error)
 
-    
-    # test Skeleton
-    #net.load_state_dict(torch.load('MODEL.pth'))
-    #net.eval()
-    #diameter_means_snet = get_diameters(net, img_path_list)
-        
 
+        
+    # resultados (best loss)
     dataset = {
                 'Modelo':model_list,
                 'Min Val Loss':error_list,
@@ -240,20 +233,3 @@ if __name__ == "__main__":
               }
     df = pd.DataFrame(dataset)
     df.to_csv('resultados/losses_'+now.strftime("%Y%m%d%H%M")+'.csv', index=False)
-    
-    
-    # realizamos las predicciones y el procesamiento posterior
-    '''
-    gts_path = "data_dm_overlapping/diameter_means.pkl"
-    
-    mydataset = {
-        'Imagen': img_path_list,
-        'Ground Truth': matchGt(img_path_list, gts_path),
-        'U-Net': diameter_means_unet,
-        'SkeletonNet': diameter_means_snet
-    }
-
-    df = pd.DataFrame(mydataset)
-    #print(tabulate(df, headers = 'keys', tablefmt = 'psql'))
-    df.to_csv('diametros_'+now.strftime("%Y%m%d%H%M")+'.csv', index=False)
-    '''
