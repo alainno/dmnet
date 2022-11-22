@@ -88,7 +88,8 @@ def batch_from_folder(folder_path):
 
     tf = transforms.Compose([
                     transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.114, 0.114, 0.114],std=[0.237, 0.237, 0.237])
+                    transforms.Normalize(mean=[0.114],std=[0.237])
+                    # transforms.Normalize(mean=[0.114, 0.114, 0.114],std=[0.237, 0.237, 0.237])
                 ])
     
     for filename in os.listdir(folder_path):
