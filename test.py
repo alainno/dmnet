@@ -6,18 +6,19 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from unet import UNet
+from hednet import HedNet
 
 def get_args():
-    parser = argparse.ArgumentParser(description='Train the UNet on images and target masks')
-    parser.add_argument('--architecture', '-a', type=str, default="UNet", help='Train with UNet')
+    parser = argparse.ArgumentParser(description='Train the UNet and SkeletonNet on images and target masks')
+    parser.add_argument('-a', '--architecture', type=str, choices=["unet","skeleton"], default="unet", help='Architecture UNet or SkeletonNet')
     return parser.parse_args()
 
 # def net(input):
 #     return torch.randn(2, 1, 256, 256)
 
 def get_test_loader(batch_size=2):
-    test_img_path = "/Users/alain/Documents/desarrollo/dmnet/datasets/synthetic/test/images/"
-    test_gt_path = "/Users/alain/Documents/desarrollo/dmnet/datasets/synthetic/test/masks/"
+    test_img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test/images/"
+    test_gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test/masks/"
 
     trans = transforms.Compose([
         transforms.ToTensor(),
@@ -35,7 +36,7 @@ def get_test_loader(batch_size=2):
     return test_loader
 
 
-def test(model, batch_size=2, printlog=False):
+def test(model, device, batch_size=2, printlog=False):
     if printlog:
         print("Iniciando el testing...")
     
@@ -51,6 +52,9 @@ def test(model, batch_size=2, printlog=False):
     test_loss = 0
     for batch in test_loader:
         input, ground_truth = batch['image'],batch['mask']
+        input = input.to(device=device, dtype=torch.float32)
+        ground_truth = ground_truth.to(device=device, dtype=torch.float32)
+
         #target = net(input)
         with torch.no_grad():
             output = model(input)
@@ -60,19 +64,29 @@ def test(model, batch_size=2, printlog=False):
     test_loss /= len(test_loader)
     return test_loss
 
+def get_device():
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda:0"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    return device
+
 
 if __name__=='__main__':
     args = get_args()
 
-    #if args.architecture == 'SkeletonNet':
-    # guardar la curva de pérdida
+    if args.architecture == 'unet':
+        print("Iniciando el test con U-Net...")
+        net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=64)
+    elif args.architecture == 'skeleton':
+        print("Test con Skeleton-Net...")
+        net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=64)
+   
+    device = get_device()
+    net.to(device=device)
+    net.load_state_dict(torch.load('checkpoints/model_unet_2022.pth'))
 
-    print('Testing with U-Net...')
-
-    model = UNet(n_channels=3,n_classes=1,bilinear=False,n_features=64)
-    
-    model.load_state_dict(torch.load('checkpoints/model.pth'))
-
-    test_loss = test(model, batch_size=4, printlog=True)
+    test_loss = test(net, device, batch_size=4, printlog=True)
 
     print('Test L1 Loss:', test_loss)

@@ -4,8 +4,10 @@ import numpy as np
 from tqdm import tqdm
 from torchvision import transforms
 from torch.utils.data import DataLoader, random_split
+import argparse
 
 from unet import UNet
+from hednet import HedNet
 from utils.dataset import BasicDataset
 
 
@@ -15,8 +17,8 @@ class Trainer:
         self.net = net
         self.device = device
 
-        img_path = "/Users/alain/Documents/desarrollo/dmnet/datasets/synthetic/train/images/"
-        gt_path = "/Users/alain/Documents/desarrollo/dmnet/datasets/synthetic/train/masks/"
+        img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train/images/"
+        gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train/masks/"
 
         trans = transforms.Compose([
             transforms.ToTensor(),
@@ -26,7 +28,7 @@ class Trainer:
         dataset = BasicDataset(imgs_dir = img_path, masks_dir = gt_path, transforms=trans, mask_h5=True)
 
         val_percent = 0.2
-        batch_size = 2
+        batch_size = 4
 
         self.n_val = int(len(dataset) * val_percent)
         self.n_train = len(dataset) - self.n_val
@@ -144,28 +146,54 @@ class Trainer:
         # print(min_val_loss)
         return min(train_losses),min(val_losses)
 
+def get_args():
+    parser = argparse.ArgumentParser(description='Train the UNet and SkeletonNet on images and target masks')
+    parser.add_argument('-a', '--architecture', type=str, choices=["unet","skeleton"], default="unet", help='Architecture UNet or SkeletonNet')
+    parser.add_argument('-l', '--loss', type=str, choices=["mae","mse",'smooth'], default="mae", help='Loss function')
+    return parser.parse_args()
 
+def get_device():
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda:0"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    return device
+    
+    
 if __name__ == "__main__":
 
-    print(torch.__version__)
-
-    print("Iniciando el entrenamiento con U-Net...")
-
-    net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=64)
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    #print(torch.__version__)
+    args = get_args()
+    
+    if args.architecture == 'unet':
+        print("Iniciando el entrenamiento con U-Net...")
+        net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=64)
+    elif args.architecture == 'skeleton':
+        print("Iniciando el entrenamiento con Skeleton-Net...")
+        net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=64)
+        
+    device = get_device()
     net.to(device=device)
 
-    # criterion = torch.nn.L1Loss()
-    criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(net.parameters(), lr=10**-3, weight_decay=5*(10**-6))
+    if args.loss == 'mae':
+        criterion = torch.nn.L1Loss()
+    elif args.loss == 'mse':
+        criterion = torch.nn.MSELoss()
+    elif args.loss == 'smooth':
+        criterion = torch.nn.SmoothL1Loss()
+        
+    # criterion = torch.nn.MSELoss()
+    
+    optimizer = torch.optim.Adam(net.parameters(), lr=10**-4, weight_decay=5*(10**-6))
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.96)
 
     trainer = Trainer(net, device)
     min_train_loss, min_val_loss = trainer.train_and_validate(epochs=500,
-                                                            criterion=criterion,
-                                                            optimizer=optimizer,
-                                                            scheduler=scheduler,
-                                                            model_output_path="checkpoints/model.pth")
+                                                                criterion=criterion,
+                                                                optimizer=optimizer,
+                                                                scheduler=scheduler,
+                                                                model_output_path="checkpoints/model_unet_2022.pth")
 
     print("Min Training L1 Loss:", min_train_loss)
     print("Min Validation L1 Loss:", min_val_loss)
