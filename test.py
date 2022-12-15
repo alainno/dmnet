@@ -4,17 +4,24 @@ import torch.nn as nn
 from utils.dataset import BasicDataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
+import numpy as np
 
 from unet import UNet
 from hednet import HedNet
 
 def get_args():
-    parser = argparse.ArgumentParser(description='Train the UNet and SkeletonNet on images and target masks')
+    parser = argparse.ArgumentParser(description='Test the UNet and SkeletonNet')
     parser.add_argument('-a', '--architecture', type=str, choices=["unet","skeleton"], default="unet", help='Architecture UNet or SkeletonNet')
+    parser.add_argument('-l', '--loss', type=str, choices=["mae","mse",'smooth'], default="mae", help='Train Loss function')
     return parser.parse_args()
 
-# def net(input):
-#     return torch.randn(2, 1, 256, 256)
+def get_device():
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda:0"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    return device
 
 def get_test_loader(batch_size=2):
     test_img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test/images/"
@@ -46,47 +53,73 @@ def test(model, device, batch_size=2, printlog=False):
         print(f'{len(test_loader)} test batches of {batch_size} samples loaded')
 
     criterion = nn.L1Loss()
+    criterion2 = nn.MSELoss()
 
     model.eval()
 
-    test_loss = 0
+    test_loss, test_loss2 = 0,0
+    maes, mses = 0,0
     for batch in test_loader:
-        input, ground_truth = batch['image'],batch['mask']
+        input, groundtruth = batch['image'],batch['mask']
         input = input.to(device=device, dtype=torch.float32)
-        ground_truth = ground_truth.to(device=device, dtype=torch.float32)
+        groundtruth = groundtruth.to(device=device, dtype=torch.float32)
+        #ground_truh = np.asarray(ground_truth)
+        #print(type(ground_truth))
+        #print(ground_truth.shape)
 
-        #target = net(input)
         with torch.no_grad():
             output = model(input)
-            loss = criterion(output, ground_truth)
+            
+            #print(output.shape)
+            loss = criterion(output, groundtruth)
+            
+            loss2 = criterion2(output, groundtruth)
+            
+            mae,mse = 0,0
+            for k in range(output.shape[0]):
+                a = output.detach().cpu().numpy()[k].squeeze()
+                b = groundtruth.detach().cpu().numpy()[k].squeeze()
+                for i in range(a.shape[0]):
+                    for j in range(a.shape[1]):
+                        mae += abs(a[i][j]-b[i][j])
+                        mse += abs(a[i][j]-b[i][j])**2
+                #mae += abs(output.detach().cpu().numpy()[i].squeeze().sum()-groundtruth.detach().cpu().numpy()[i].squeeze().sum())
+            maes += mae/(input.shape[0]*256*256)
+            mses += mse/(input.shape[0]*256*256)
+            #print('mae=',)
+
         test_loss += loss.item()
+        test_loss2 += loss2.item()
+        #test_loss += mae / input.shape[0]
 
     test_loss /= len(test_loader)
-    return test_loss
+    #return test_loss, maes/len(test_loader)
+    #return test_loss, test_loss2 / len(test_loader)
+    return test_loss, mses / len(test_loader)
 
-def get_device():
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = "cuda:0"
-    elif torch.backends.mps.is_available():
-        device = "mps"
-    return device
 
 
 if __name__=='__main__':
+    
     args = get_args()
-
+    
+    print('Test Hyperparameters:')
+    print('-'*20)
+    print('Architecture:', args.architecture)
+    print('Train Loss:', args.loss)
+    
     if args.architecture == 'unet':
-        print("Iniciando el test con U-Net...")
-        net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=64)
+        net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=32)
     elif args.architecture == 'skeleton':
-        print("Test con Skeleton-Net...")
-        net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=64)
+        net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=32)
+        
+    checkpoint = f"checkpoints/model_{args.architecture}_{args.loss}.pth"
    
     device = get_device()
     net.to(device=device)
-    net.load_state_dict(torch.load('checkpoints/model_unet_2022.pth'))
+    net.load_state_dict(torch.load(checkpoint))
 
-    test_loss = test(net, device, batch_size=4, printlog=True)
+    mae, mse = test(net, device, batch_size=4, printlog=False)
 
-    print('Test L1 Loss:', test_loss)
+    print('MAE:', mae)
+    print('MSE:', mse)

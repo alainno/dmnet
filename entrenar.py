@@ -132,13 +132,17 @@ class Trainer:
 
             val_loss = self.__validate(epoch)
             val_losses.append(val_loss)
+            
+            #if (epoch+1) % 10 == 0:
+            #    self.scheduler.step()
+            self.scheduler.step() # para StepLR cada step_size
 
             if val_loss < min_val_loss:
                 min_val_loss = val_loss
                 epochs_without_improve = 0
                 torch.save(self.net.state_dict(), model_output_path)
             else:
-                epochs_without_improve +=1
+                epochs_without_improve += 1
                 if epochs_without_improve > max_epochs_without_improve:
                     print("Early stopping!")
                     break
@@ -166,12 +170,18 @@ if __name__ == "__main__":
     #print(torch.__version__)
     args = get_args()
     
+    print('Training Hyperparameters:')
+    print('-'*20)
+    print('Architecture:', args.architecture)
+    print('Loss:', args.loss)
+    
     if args.architecture == 'unet':
-        print("Iniciando el entrenamiento con U-Net...")
-        net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=64)
+        net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=32)
+        optimizer = torch.optim.Adam(net.parameters(), lr=10**-3, weight_decay=5*(10**-6))
+        
     elif args.architecture == 'skeleton':
-        print("Iniciando el entrenamiento con Skeleton-Net...")
-        net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=64)
+        net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=32)
+        optimizer = torch.optim.Adam(net.parameters(), lr=10**-3)
         
     device = get_device()
     net.to(device=device)
@@ -182,18 +192,20 @@ if __name__ == "__main__":
         criterion = torch.nn.MSELoss()
     elif args.loss == 'smooth':
         criterion = torch.nn.SmoothL1Loss()
-        
+    
+    checkpoint = f"checkpoints/model_{args.architecture}_{args.loss}.pth"
     # criterion = torch.nn.MSELoss()
     
-    optimizer = torch.optim.Adam(net.parameters(), lr=10**-4, weight_decay=5*(10**-6))
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.96)
+    #optimizer = torch.optim.Adam(net.parameters(), lr=10**-4, weight_decay=5*(10**-6))
+    #scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.96)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.96) # ExponentialLR cada 'step_size' pasos
 
     trainer = Trainer(net, device)
     min_train_loss, min_val_loss = trainer.train_and_validate(epochs=500,
                                                                 criterion=criterion,
                                                                 optimizer=optimizer,
                                                                 scheduler=scheduler,
-                                                                model_output_path="checkpoints/model_unet_2022.pth")
+                                                                model_output_path=checkpoint)
 
     print("Min Training L1 Loss:", min_train_loss)
     print("Min Validation L1 Loss:", min_val_loss)
