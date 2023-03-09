@@ -6,7 +6,7 @@ from .coordconv import CoordConv1d, CoordConv2d, CoordConv3d
 import numpy as np
 
 class HedNet(nn.Module):
-    def __init__(self, n_channels, n_classes, bilinear=True, side=4, n_features=64, use_cuda=True):
+    def __init__(self, n_channels, n_classes, bilinear=True, side=-1, n_features=64, use_cuda=True):
         super(HedNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
@@ -63,11 +63,14 @@ class HedNet(nn.Module):
         fuse = torch.cat((upsample1, upsample2, upsample3, upsample4), dim=1)
         fuse = self.dilation(fuse)
         
-        ensembled = upsample2 * 0.2
-        ensembled = ensembled.add(fuse * 0.8)
+#        ensembled = upsample2 * 0.2
+        ensembled = upsample1 * 0.5
+        ensembled = ensembled.add(fuse * 0.5)
         
         results = [upsample1, upsample2, upsample3, upsample4, fuse, ensembled]
+        #results = [upsample1, upsample2, upsample3, upsample4, fuse]
         #results = [torch.sigmoid(r) for r in results]
+        #return results[self.side]
         return results[self.side]
         
         #return x
@@ -89,3 +92,17 @@ class HedNet(nn.Module):
         return logits
         '''
         
+class EnsembleSkeletonNet(nn.Module):
+    def __init__(self, model1, model2):
+        super(EnsembleSkeletonNet, self).__init__()
+        self.model1 = model1
+        self.model2 = model2
+        #self.avg = nn.AvgPool2d(2)
+        
+    def forward(self, x):
+        out1 = self.model1(x)
+        out2 = self.model2(x)
+        #out = self.avg(torch.cat([out1,out2], dim=1))
+        out = out1 * 0.5
+        out = out.add(out2 * 0.5)
+        return out
