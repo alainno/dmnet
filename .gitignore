@@ -11,3 +11,4 @@ checkpoints/
 resultados/
 datasets/
 output.log
+!datasets/*.py
