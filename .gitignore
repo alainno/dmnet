@@ -11,4 +11,4 @@ checkpoints/
 resultados/
 datasets/*
 output.log
-!datasets/*/*.py
+!datasets/ofda/distance_transform.py
