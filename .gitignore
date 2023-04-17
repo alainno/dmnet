@@ -9,6 +9,11 @@ data_dm_overlapping/
 tmp/
 checkpoints/
 resultados/
-datasets/*
+datasets/
 output.log
-!datasets/ofda/distance_transform.py
+
+!datasets/
+datasets/*
+!datasets/ofda/
+datasets/ofda/*
+!datasets/ofda/*.py
