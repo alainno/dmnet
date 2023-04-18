@@ -10,3 +10,10 @@ tmp/
 checkpoints/
 resultados/
 datasets/
+output.log
+
+!datasets/
+datasets/*
+!datasets/ofda/
+datasets/ofda/*
+!datasets/ofda/*.py
