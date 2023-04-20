@@ -147,6 +147,8 @@ class Trainer:
             #    self.scheduler.step()
             self.scheduler.step() # para StepLR cada step_size
 
+            self.scheduler.step()
+
             if val_loss < min_val_loss:
                 min_val_loss = val_loss
                 epochs_without_improve = 0

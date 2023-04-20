@@ -28,9 +28,11 @@ class DistanceMap:
 
 
 class TestDistanceMap(unittest.TestCase):
-#    def runTest(self):
-#        dm = DistanceMap()
-#        self.assertEqual(dm.save_distance_transform("ofda_segmentation/0157.png", "gt_dm/0157.png"), True, "generación incorrecta")
+
+    def runTest(self):
+        dm = DistanceMap()
+        self.assertEqual(dm.save_distance_transform("ofda_segmentation/0157.png", "gt_dm/0157.png"), True, "generación incorrecta")
+        
         
     def test_distance_transform_batch(self):
         dm = DistanceMap()
