@@ -5,6 +5,7 @@ from tqdm import tqdm
 from torchvision import transforms
 from torch.utils.data import DataLoader, random_split
 import argparse
+import time
 
 from unet import UNet
 from hednet import HedNet
@@ -12,16 +13,20 @@ from utils.dataset import BasicDataset
 
 class Trainer:
 
-    def __init__(self, net, device):
+    def __init__(self, net, device, test_ofda_subset=False):
         self.net = net
         self.device = device
 
-        img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train/images/"
-        gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train/masks/"
+        #img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train/images/"
+        #gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train/masks/"
+        img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train2/images/"
+        gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train2/masks/"
 
         trans = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.114, 0.114, 0.114],std=[0.237, 0.237, 0.237])
+            transforms.Normalize(mean=[0.190, 0.190, 0.190],std=[0.283, 0.283, 0.283])
+            #transforms.Normalize(mean=[0.173, 0.173, 0.173],std=[0.289, 0.289, 0.289]) # synthetic overlapped
+            #transforms.Normalize(mean=[0.114, 0.114, 0.114],std=[0.237, 0.237, 0.237])
         ])
 
         dataset = BasicDataset(imgs_dir = img_path, masks_dir = gt_path, transforms=trans, mask_h5=True)
@@ -38,18 +43,41 @@ class Trainer:
 
         # self.train_data_loader = self.__get_train_data_loader()
         # self.val_data_loader = self.__get_val_data_loader()
+        self.test_ofda_subset = test_ofda_subset
+        
+        
+        self.__init_test_dataset(batch_size=batch_size)
+        
     
     def __init_test_dataset(self, batch_size=2):
-        test_img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test/images/"
-        test_gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test/masks/"
+        #mean=[0.173, 0.173, 0.173] # synthetic overlapped
+        #std=[0.289, 0.289, 0.289] # syntehtics overlapped
+        mean=[0.190, 0.190, 0.190]
+        std=[0.283, 0.283, 0.283]
+        invert = 0
+        if self.test_ofda_subset:
+#            test_img_path = "/home/aalejo/proyectos/dmnet/datasets/ofda/ofda_segmentation/"
+#            test_gt_path = "/home/aalejo/proyectos/dmnet/datasets/ofda/gt_dm/"
+            test_img_path = "/home/aalejo/proyectos/dmnet/datasets/ofda/test/samples/"
+            test_gt_path = "/home/aalejo/proyectos/dmnet/datasets/ofda/test/gt/"
+            invert = 1
+            mean=[0.726, 0.726, 0.726]
+            std=[0.201, 0.201, 0.201]
+        else:
+            test_img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test2/images/"
+            test_gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test2/masks/"
 
         trans = transforms.Compose([
+            transforms.RandomInvert(invert),#invert for obtain black background and white fibers
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.114, 0.114, 0.114],std=[0.237, 0.237, 0.237])
+            transforms.Normalize(mean=mean,std=std)
+            #transforms.Normalize(mean=[0.114, 0.114, 0.114],std=[0.237, 0.237, 0.237])
         ])
 
         test_dataset = BasicDataset(imgs_dir = test_img_path, masks_dir = test_gt_path, transforms=trans, mask_h5=True)
-        self.test_data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+        #self.test_data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
+        #self.test_data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, drop_last=False)
+        self.test_data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, drop_last=True)
 
 
     def __train(self, epoch):
@@ -148,7 +176,6 @@ class Trainer:
         if printlog:
             print("Iniciando el testing...")
 
-        #test_loader = get_test_loader(batch_size=batch_size)
         self.__init_test_dataset(batch_size=batch_size)
 
         if printlog:
@@ -161,6 +188,9 @@ class Trainer:
 
         test_loss, test_loss2 = 0, 0
         maes, mses = 0, 0
+        
+        total_time = 0
+        
         for batch in self.test_data_loader:
             input, groundtruth = batch['image'], batch['mask']
             input = input.to(device=self.device, dtype=torch.float32)
@@ -170,7 +200,9 @@ class Trainer:
             #print(ground_truth.shape)
 
             with torch.no_grad():
+                start_time = time.time()
                 output = self.net(input)
+                total_time += (time.time() - start_time)
 
                 #print(output.shape)
                 loss = criterion(output, groundtruth)
@@ -193,8 +225,36 @@ class Trainer:
             test_loss += loss.item()
             test_loss2 += loss2.item()
             #test_loss += mae / input.shape[0]
+        
+        if printlog:
+            print(f'Execution time: {total_time}')
+        
 
         test_loss /= len(self.test_data_loader)
         #return test_loss, maes/len(test_loader)
         #return test_loss, test_loss2 / len(test_loader)
-        return test_loss, mses / len(self.test_data_loader)        
+        return test_loss, mses / len(self.test_data_loader)
+    
+
+    def test_output(self, batch_size=4, printlog=False, batch=None):
+        if printlog:
+            print("Iniciando el testing...")
+
+        #self.__init_test_dataset(batch_size=batch_size)
+
+        if printlog:
+            print(f'{len(self.test_data_loader)} test batches of {batch_size} samples loaded')
+
+        self.net.eval()
+        
+        if batch is None:
+            batch = next(iter(self.test_data_loader))
+
+        inputs, groundtruth = batch['image'], batch['mask']
+        inputs = inputs.to(device=self.device, dtype=torch.float32)
+        #groundtruth = groundtruth.to(device=self.device, dtype=torch.float32)
+
+        with torch.no_grad():
+            output = self.net(inputs)
+
+        return inputs.cpu(), groundtruth.cpu(), output.cpu()

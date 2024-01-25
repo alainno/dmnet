@@ -4,7 +4,7 @@ import torch.nn.modules.conv as conv
 
 
 class AddCoords(nn.Module):
-    def __init__(self, rank, with_r=False, use_cuda=True):
+    def __init__(self, rank, with_r=False, use_cuda=0): # use_cuda is de index of GPU (0,1,2,...), for use without cuda, use -1
         super(AddCoords, self).__init__()
         self.rank = rank
         self.with_r = with_r
@@ -24,9 +24,11 @@ class AddCoords(nn.Module):
             xx_channel = xx_channel * 2 - 1
             xx_channel = xx_channel.repeat(batch_size_shape, 1, 1)
 
-            if torch.cuda.is_available and self.use_cuda:
-                input_tensor = input_tensor.cuda()
-                xx_channel = xx_channel.cuda()
+            if torch.cuda.is_available and self.use_cuda>=0:
+                #input_tensor = input_tensor.cuda()
+                input_tensor = input_tensor.to(device="cuda:"+str(self.use_cuda))
+                #xx_channel = xx_channel.cuda()
+                xx_channel = xx_channel.to(device="cuda:"+str(self.use_cuda))
             out = torch.cat([input_tensor, xx_channel], dim=1)
 
             if self.with_r:
@@ -58,10 +60,14 @@ class AddCoords(nn.Module):
             xx_channel = xx_channel.repeat(batch_size_shape, 1, 1, 1)
             yy_channel = yy_channel.repeat(batch_size_shape, 1, 1, 1)
 
-            if torch.cuda.is_available and self.use_cuda:
-                input_tensor = input_tensor.cuda()
-                xx_channel = xx_channel.cuda()
-                yy_channel = yy_channel.cuda()
+            if torch.cuda.is_available and self.use_cuda>=0:
+                #print("use cuda:" + str(self.use_cuda))
+                #input_tensor = input_tensor.cuda()
+                #xx_channel = xx_channel.cuda()
+                #yy_channel = yy_channel.cuda()
+                input_tensor = input_tensor.to(device="cuda:"+str(self.use_cuda))
+                xx_channel = xx_channel.to(device="cuda:"+str(self.use_cuda))
+                yy_channel = yy_channel.to(device="cuda:"+str(self.use_cuda))
             out = torch.cat([input_tensor, xx_channel, yy_channel], dim=1)
 
             if self.with_r:
@@ -94,11 +100,15 @@ class AddCoords(nn.Module):
             zx_channel = zx_channel.permute(0, 1, 4, 2, 3)
             zz_channel = torch.cat([zx_channel + i for i in range(dim_y)], dim=3)
 
-            if torch.cuda.is_available and self.use_cuda:
-                input_tensor = input_tensor.cuda()
-                xx_channel = xx_channel.cuda()
-                yy_channel = yy_channel.cuda()
-                zz_channel = zz_channel.cuda()
+            if torch.cuda.is_available and self.use_cuda>=0:
+                #input_tensor = input_tensor.cuda()
+                #xx_channel = xx_channel.cuda()
+                #yy_channel = yy_channel.cuda()
+                #zz_channel = zz_channel.cuda()
+                input_tensor = input_tensor.to(device="cuda:"+str(self.use_cuda))
+                xx_channel = xx_channel.to(device="cuda:"+str(self.use_cuda))
+                yy_channel = yy_channel.to(device="cuda:"+str(self.use_cuda))
+                zz_channel = zz_channel.to(device="cuda:"+str(self.use_cuda))
             out = torch.cat([input_tensor, xx_channel, yy_channel, zz_channel], dim=1)
 
             if self.with_r:
@@ -114,7 +124,7 @@ class AddCoords(nn.Module):
 
 class CoordConv1d(conv.Conv1d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True, with_r=False, use_cuda=True):
+                 padding=0, dilation=1, groups=1, bias=True, with_r=False, use_cuda=0):
         super(CoordConv1d, self).__init__(in_channels, out_channels, kernel_size,
                                           stride, padding, dilation, groups, bias)
         self.rank = 1
@@ -136,7 +146,7 @@ class CoordConv1d(conv.Conv1d):
 
 class CoordConv2d(conv.Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True, with_r=False, use_cuda=True):
+                 padding=0, dilation=1, groups=1, bias=True, with_r=False, use_cuda=0):
         super(CoordConv2d, self).__init__(in_channels, out_channels, kernel_size,
                                           stride, padding, dilation, groups, bias)
         self.rank = 2
@@ -158,7 +168,7 @@ class CoordConv2d(conv.Conv2d):
 
 class CoordConv3d(conv.Conv3d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True, with_r=False, use_cuda=True):
+                 padding=0, dilation=1, groups=1, bias=True, with_r=False, use_cuda=0):
         super(CoordConv3d, self).__init__(in_channels, out_channels, kernel_size,
                                           stride, padding, dilation, groups, bias)
         self.rank = 3

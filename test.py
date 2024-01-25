@@ -8,96 +8,21 @@ import numpy as np
 
 from unet import UNet
 from hednet import HedNet
+from hednet import EnsembleSkeletonNet
+
+from trainer import Trainer
+from training_functions import get_device
 
 def get_args():
     parser = argparse.ArgumentParser(description='Test the UNet and SkeletonNet')
     parser.add_argument('-a', '--architecture', type=str, choices=["unet","skeleton"], default="unet", help='Architecture UNet or SkeletonNet')
     parser.add_argument('-l', '--loss', type=str, choices=["mae","mse",'smooth'], default="mae", help='Train Loss function')
+    parser.add_argument('-nf', '--n_features', type=int, choices=[16,32,64], default=32, help='UNet 1st convolution features')
+    parser.add_argument('-lri', '--lr_i', type=int, choices=[2,3,4,5,6], default=3, help='Learning Rate 10**i')
+    parser.add_argument('-wdi', '--wd_i', type=int, choices=[3,4,5,6], default=6, help='Loss function')
+    parser.add_argument('-e', '--ensemble_type', type=str, choices=["inner","outer"], default="inner", help='Ensemble type')
+    parser.add_argument('-ts', '--testing_subset', type=str, choices=["synthetic","ofda"], default="synthetic", help='testing subset')
     return parser.parse_args()
-
-def get_device():
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = "cuda:0"
-    elif torch.backends.mps.is_available():
-        device = "mps"
-    return device
-
-def get_test_loader(batch_size=2):
-    test_img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test/images/"
-    test_gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test/masks/"
-
-    trans = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.114, 0.114, 0.114],std=[0.237, 0.237, 0.237])
-    ])
-
-    test_dataset = BasicDataset(imgs_dir = test_img_path, masks_dir = test_gt_path, transforms=trans, mask_h5=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
-    # test_loader = [
-    #     {'image':torch.rand(3,5),'mask':torch.rand(3,5)},
-    #     {'image':torch.rand(3,5),'mask':torch.rand(3,5)},
-    #     {'image':torch.rand(3,5),'mask':torch.rand(3,5)},
-    #     {'image':torch.rand(3,5),'mask':torch.rand(3,5)},
-    # ]
-    return test_loader
-
-
-def test(model, device, batch_size=2, printlog=False):
-    if printlog:
-        print("Iniciando el testing...")
-    
-    test_loader = get_test_loader(batch_size=batch_size)
-    
-    if printlog:
-        print(f'{len(test_loader)} test batches of {batch_size} samples loaded')
-
-    criterion = nn.L1Loss()
-    criterion2 = nn.MSELoss()
-
-    model.eval()
-
-    test_loss, test_loss2 = 0,0
-    maes, mses = 0,0
-    for batch in test_loader:
-        input, groundtruth = batch['image'],batch['mask']
-        input = input.to(device=device, dtype=torch.float32)
-        groundtruth = groundtruth.to(device=device, dtype=torch.float32)
-        #ground_truh = np.asarray(ground_truth)
-        #print(type(ground_truth))
-        #print(ground_truth.shape)
-
-        with torch.no_grad():
-            output = model(input)
-            
-            #print(output.shape)
-            loss = criterion(output, groundtruth)
-            
-            loss2 = criterion2(output, groundtruth)
-            
-            mae,mse = 0,0
-            for k in range(output.shape[0]):
-                a = output.detach().cpu().numpy()[k].squeeze()
-                b = groundtruth.detach().cpu().numpy()[k].squeeze()
-                for i in range(a.shape[0]):
-                    for j in range(a.shape[1]):
-                        mae += abs(a[i][j]-b[i][j])
-                        mse += abs(a[i][j]-b[i][j])**2
-                #mae += abs(output.detach().cpu().numpy()[i].squeeze().sum()-groundtruth.detach().cpu().numpy()[i].squeeze().sum())
-            maes += mae/(input.shape[0]*256*256)
-            mses += mse/(input.shape[0]*256*256)
-            #print('mae=',)
-
-        test_loss += loss.item()
-        test_loss2 += loss2.item()
-        #test_loss += mae / input.shape[0]
-
-    test_loss /= len(test_loader)
-    #return test_loss, maes/len(test_loader)
-    #return test_loss, test_loss2 / len(test_loader)
-    return test_loss, mses / len(test_loader)
-
-
 
 if __name__=='__main__':
     
@@ -107,19 +32,52 @@ if __name__=='__main__':
     print('-'*20)
     print('Architecture:', args.architecture)
     print('Train Loss:', args.loss)
+    print('Testing Subset:', args.testing_subset)
+    
+    #if args.architecture == 'unet':
+    #    net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=args.n_features)
+    #elif args.architecture == 'skeleton':
+    #    net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=32)
+        
+    #checkpoint = f"checkpoints/model_{args.architecture}_{args.loss}.pth"
+    #checkpoint = f"checkpoints/model_{args.architecture}_{args.loss}_{args.n_features}_{args.lr_i}_{args.wd_i}.pth"
     
     if args.architecture == 'unet':
-        net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=32)
-    elif args.architecture == 'skeleton':
-        net = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=32)
+        net = UNet(n_channels=3, n_classes=1, bilinear=False, n_features=args.n_features)
+        checkpoint = f'checkpoints/model3_unet_{args.loss}_{args.n_features}_{args.lr_i}_{args.wd_i}.pth'
         
-    checkpoint = f"checkpoints/model_{args.architecture}_{args.loss}.pth"
-   
+    elif args.architecture == 'skeleton':
+        if args.ensemble_type == 'inner':
+            net = HedNet(n_channels=3, n_classes=1, bilinear=False, n_features=args.n_features, use_cuda=1)
+        if args.ensemble_type == 'outer':
+            model1 = HedNet(n_channels=3, n_classes=1, bilinear=False, side=0, n_features=32)
+            model2 = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=32)
+            net = EnsembleSkeletonNet(model1, model2)
+        checkpoint = f"checkpoints/model3_snet_{args.ensemble_type}_{args.loss}.pth"
+        
+        
     device = get_device()
+    print(f'Using {device} as device')
     net.to(device=device)
-    net.load_state_dict(torch.load(checkpoint))
+    
+    trainer = Trainer(net, device, test_ofda_subset=(args.testing_subset == "ofda"))
 
-    mae, mse = test(net, device, batch_size=4, printlog=False)
+    #img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train2/images/"
+    #gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/train2/masks/"
+    #trainer.load_test_dataset(img_path, gt_path)    
+    
+    trainer.net.load_state_dict(torch.load(checkpoint, map_location=device))
+
+    mae, mse = trainer.test(batch_size=4, printlog=True)
 
     print('MAE:', mae)
     print('MSE:', mse)
+    
+    # guardar resultado
+    #if args.testing_subset == 'synthetic':
+    #    with open("resultados/test_log.csv",'a') as file_log:
+    #        file_log.write(f'{args.architecture},{args.loss},{args.n_features},{args.lr_i},{args.wd_i},{mae},{mse}\n')
+    if args.testing_subset == "ofda":
+        #with open("resultados/testing_ofda.csv",'a') as file_log:
+        with open("resultados/testing2_ofda.csv",'a') as file_log:
+            file_log.write(f'{args.architecture},{checkpoint},{args.loss},{mae},{mse}\n')

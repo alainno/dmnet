@@ -28,20 +28,17 @@ class BasicDataset(Dataset):
         return len(self.ids)
 
     @classmethod
-    def preprocess(cls, pil_img, scale, debug=False, mask_h5=False):
+    def preprocess(cls, pil_img, scale, debug=False):
         
-        if mask_h5:
-            img_nd = pil_img
-        else:
-            w, h = pil_img.size
-            newW, newH = int(scale * w), int(scale * h)
-            assert newW > 0 and newH > 0, 'Scale is too small'
-            pil_img = pil_img.resize((newW, newH))
+        w, h = pil_img.size
+        newW, newH = int(scale * w), int(scale * h)
+        assert newW > 0 and newH > 0, 'Scale is too small'
+        pil_img = pil_img.resize((newW, newH))
 
-            if(debug):
-                print('pil_img.mode', pil_img.mode)
+        if(debug):
+            print('pil_img.mode', pil_img.mode)
 
-            img_nd = np.array(pil_img)
+        img_nd = np.array(pil_img)
         
         if(debug):
             print('img_nd.shape', img_nd.shape)
@@ -56,6 +53,15 @@ class BasicDataset(Dataset):
         #    img_trans = img_trans / 255
             
         return img_trans
+    
+    @staticmethod
+    def add_margin(pil_img, top, right, bottom, left, color):
+        width, height = pil_img.size
+        new_width = width + right + left
+        new_height = height + top + bottom
+        result = Image.new(pil_img.mode, (new_width, new_height), color)
+        result.paste(pil_img, (left, top))
+        return result
 
     def __getitem__(self, i):
         idx = self.ids[i]
@@ -70,18 +76,31 @@ class BasicDataset(Dataset):
         if self.mask_h5:
             mask_h5_data = h5py.File(mask_file[0], 'r')
             mask = np.asarray(mask_h5_data['dm'])
-            mask_size = mask.shape[::-1]
+            #mask_size = mask.shape[::-1]
+            mask = Image.fromarray(mask)
         else:
             mask = Image.open(mask_file[0]) #.convert('L')
-            mask_size = mask.size
+            #mask_size = mask.size
         
         img = Image.open(img_file[0])
+        
+        '''
+        ############# padding ############
+        diffX, diffY = 256 - mask.size[0], 256 - mask.size[1]
+        mask = BasicDataset.add_margin(mask, diffY // 2, diffX - diffX//2, diffY - diffY//2, diffX // 2, 0)
+        
+        diffX, diffY = 256 - img.size[0], 256 - img.size[1]
+        #img = BasicDataset.add_margin(img, diffY // 2, diffX - diffX//2, diffY - diffY//2, diffX // 2, 0) #synthetic
+        img = BasicDataset.add_margin(img, diffY // 2, diffX - diffX//2, diffY - diffY//2, diffX // 2, (255,255,255)) #ofda
+        ##################################
+        '''
 
-        assert img.size == mask_size, \
+        assert img.size == mask.size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
         
         #img = self.preprocess(img, self.scale)
-        mask = self.preprocess(mask, self.scale, mask_h5=self.mask_h5)
+        #mask = self.preprocess(mask, self.scale, mask_h5=self.mask_h5)
+        mask = self.preprocess(mask, self.scale)
         
         if self.transforms is not None:
             img = self.transforms(img)

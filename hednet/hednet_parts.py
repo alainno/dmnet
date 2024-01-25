@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 from .se_module import SELayer
 from .squeeze_and_excitation import ChannelSpatialSELayer, ChannelSELayer
+from .coordconv import AddCoords
 
 class RSBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -98,6 +99,21 @@ class Down(nn.Module):
 
     def forward(self, x):
         return self.maxpool_conv(x)
+    
+    
+class Down2(nn.Module):
+    """Downscaling with maxpool, add coords, then double conv"""
+
+    def __init__(self, in_channels, out_channels, use_cuda=0):
+        super().__init__()
+        self.maxpool_conv = nn.Sequential(
+            nn.MaxPool2d(2),
+            AddCoords(2, False, use_cuda=use_cuda),
+            DoubleConv(in_channels+2, out_channels)
+        )
+
+    def forward(self, x):
+        return self.maxpool_conv(x)
 
 
 class Up(nn.Module):
@@ -152,12 +168,17 @@ class UpSide(nn.Module):
         self.up = nn.ConvTranspose2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride)
         
     def forward(self, x1, x2):
-        x1 = self.up(x1)
+        #x1 = self.up(x1)
         
-        diffY = x2.size()[2] - x1.size()[2]
-        diffX = x2.size()[3] - x1.size()[3]
+        #diffY = x2.size()[2] - x1.size()[2]
+        #diffX = x2.size()[3] - x1.size()[3]
 
-        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
-                        diffY // 2, diffY - diffY // 2])
+        #x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
+        #                diffY // 2, diffY - diffY // 2])
+        
+        #print(x1.size())
+        #print(x2.size())
+        
+        x1 = self.up(x1, output_size=(x2.size()[2], x2.size()[3]))
         
         return x1

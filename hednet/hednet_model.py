@@ -2,39 +2,42 @@
 
 import torch.nn.functional as F
 from .hednet_parts import *
-from .coordconv import CoordConv1d, CoordConv2d, CoordConv3d
+from .coordconv import CoordConv1d, CoordConv2d, CoordConv3d, AddCoords
 import numpy as np
 
 class HedNet(nn.Module):
-    def __init__(self, n_channels, n_classes, bilinear=True, side=-1, n_features=64, use_cuda=True):
+    def __init__(self, n_channels, n_classes, bilinear=True, side=-1, n_features=64, use_cuda=0):
         super(HedNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.bilinear = bilinear
         self.side = side
 
-        self.coordconv = CoordConv2d(n_channels, n_features, 1, use_cuda=use_cuda) # 190x198x64
-        self.inc = DoubleConv(n_features, n_features) # 190x198x64
-        self.down1 = Down(n_features, n_features*2) # 95x99x128
-        self.down2 = Down(n_features*2, n_features*4) # 47x49x256
-        self.down3 = Down(n_features*4, n_features*8) # 23x24x512
-        self.down4 = Down(n_features*8, n_features*16) # 11x12x1024
-        self.inc2 = DoubleConv(n_features*16, n_features*32) # 11x12x2048
-        self.up1 = Up(n_features*32, n_features*8, False) # 23x24
-        self.up2 = Up(n_features*8, n_features*4, False) # 47x49
-        self.up3 = Up(n_features*4, n_features*2, False) # 95x99
-        self.up4 = Up(n_features*2, n_features, False) # 190x198
+        #self.coordconv = CoordConv2d(n_channels, n_features, 1, use_cuda=use_cuda)
+        self.coordconv = AddCoords(2, False, use_cuda=use_cuda)
+        #self.inc = DoubleConv(n_features, n_features)
+        self.inc = DoubleConv(n_channels + 2, n_features)
+        self.down1 = Down2(n_features, n_features*2, use_cuda=use_cuda)
+        self.down2 = Down2(n_features*2, n_features*4, use_cuda=use_cuda)
+        self.down3 = Down2(n_features*4, n_features*8, use_cuda=use_cuda)
+        self.down4 = Down2(n_features*8, n_features*16, use_cuda=use_cuda)
+        self.inc2 = DoubleConv(n_features*16, n_features*32)
+        self.up1 = Up(n_features*32, n_features*8, False)
+        self.up2 = Up(n_features*8, n_features*4, False)
+        self.up3 = Up(n_features*4, n_features*2, False)
+        self.up4 = Up(n_features*2, n_features, False)
         
-        self.upso1 = nn.ConvTranspose2d(n_features*8, 1, kernel_size=8, stride=8)
-        self.upso2 = nn.ConvTranspose2d(n_features*4, 1, kernel_size=4, stride=4)
-        self.upso3 = nn.ConvTranspose2d(n_features*2, 1, kernel_size=2, stride=2)
-        self.upso4 = nn.ConvTranspose2d(n_features, 1, kernel_size=1, stride=1)
-#         self.upso1 = UpSide(n_features*8, 1, kernel_size=8, stride=8)
-#         self.upso2 = UpSide(n_features*4, 1, kernel_size=4, stride=4)
-#         self.upso3 = UpSide(n_features*2, 1, kernel_size=2, stride=2)
-#         self.upso4 = UpSide(n_features, 1, kernel_size=1, stride=1)
+        #self.upso1 = nn.ConvTranspose2d(n_features*8, 1, kernel_size=8, stride=8)
+        #self.upso2 = nn.ConvTranspose2d(n_features*4, 1, kernel_size=4, stride=4)
+        #self.upso3 = nn.ConvTranspose2d(n_features*2, 1, kernel_size=2, stride=2)
+        #self.upso4 = nn.ConvTranspose2d(n_features, 1, kernel_size=1, stride=1)
         
-        self.dilation = nn.Conv2d(4, 1, kernel_size=3, padding=2, dilation=2)
+        self.upso1 = UpSide(n_features*8, 1, kernel_size=8, stride=8)
+        self.upso2 = UpSide(n_features*4, 1, kernel_size=4, stride=4)
+        self.upso3 = UpSide(n_features*2, 1, kernel_size=2, stride=2)
+        self.upso4 = UpSide(n_features, 1, kernel_size=1, stride=1)
+        
+        self.dilation = nn.Conv2d(4 + 2, 1, kernel_size=3, padding=2, dilation=2)
         
 
     def forward(self, x):
@@ -50,27 +53,26 @@ class HedNet(nn.Module):
         so3 = self.up3(so2, x2)
         so4 = self.up4(so3, x1)
         
-        upsample1 = self.upso1(so1)
-        upsample2 = self.upso2(so2)
-        upsample3 = self.upso3(so3)
-        upsample4 = self.upso4(so4)
+        #upsample1 = self.upso1(so1)
+        #upsample2 = self.upso2(so2)
+        #upsample3 = self.upso3(so3)
+        #upsample4 = self.upso4(so4)
 
-#         upsample1 = self.upso1(so1, x1)
-#         upsample2 = self.upso2(so2, x1)
-#         upsample3 = self.upso3(so3, x1)
-#         upsample4 = self.upso4(so4, x1)
+        upsample1 = self.upso1(so1, x1)
+        upsample2 = self.upso2(so2, x1)
+        upsample3 = self.upso3(so3, x1)
+        upsample4 = self.upso4(so4, x1)
         
         fuse = torch.cat((upsample1, upsample2, upsample3, upsample4), dim=1)
+        fuse = self.coordconv(fuse) # nuevo
         fuse = self.dilation(fuse)
         
-#        ensembled = upsample2 * 0.2
-        ensembled = upsample1 * 0.5
+        ensembled = upsample4 * 0.5 # upsample4 is side 1
         ensembled = ensembled.add(fuse * 0.5)
         
         results = [upsample1, upsample2, upsample3, upsample4, fuse, ensembled]
-        #results = [upsample1, upsample2, upsample3, upsample4, fuse]
-        #results = [torch.sigmoid(r) for r in results]
-        #return results[self.side]
+        #results = [upsample1, upsample2, upsample3, upsample4, ensembled]
+        
         return results[self.side]
         
         #return x
