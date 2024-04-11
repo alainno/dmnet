@@ -7,8 +7,9 @@ from torch.utils.data import Dataset
 import logging
 from PIL import Image
 import h5py
+import random
 
-class BasicDataset(Dataset):
+class OfdaDataset(Dataset):
     def __init__(self, imgs_dir, masks_dir, scale=1, mask_suffix='', transforms=None, mask_h5=False):
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
@@ -62,6 +63,10 @@ class BasicDataset(Dataset):
         result = Image.new(pil_img.mode, (new_width, new_height), color)
         result.paste(pil_img, (left, top))
         return result
+    
+    def __set_seed(self, seed):
+        random.seed(seed)
+        torch.manual_seed(seed)
 
     def __getitem__(self, i):
         idx = self.ids[i]
@@ -77,7 +82,7 @@ class BasicDataset(Dataset):
             mask_h5_data = h5py.File(mask_file[0], 'r')
             mask = np.asarray(mask_h5_data['dm'])
             #mask_size = mask.shape[::-1]
-            mask = Image.fromarray(mask).convert('L')
+            mask = Image.fromarray(mask)
         else:
             mask = Image.open(mask_file[0]) #.convert('L')
             #mask_size = mask.size
@@ -98,13 +103,14 @@ class BasicDataset(Dataset):
         assert img.size == mask.size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
         
-        #img = self.preprocess(img, self.scale)
-        #mask = self.preprocess(mask, self.scale, mask_h5=self.mask_h5)
         #mask = self.preprocess(mask, self.scale)
         
         if self.transforms is not None:
-            img = self.transforms(img)
-            mask = self.transforms(mask)
+            seed = random.randint(0, 2**32)
+            self.__set_seed(seed)
+            img = self.transforms[0](img)
+            self.__set_seed(seed)
+            mask = self.transforms[1](mask)
         
         return {
             'image': img, #torch.from_numpy(img).type(torch.FloatTensor),
@@ -114,6 +120,6 @@ class BasicDataset(Dataset):
         }
 
 
-class CarvanaDataset(BasicDataset):
-    def __init__(self, imgs_dir, masks_dir, scale=1):
-        super().__init__(imgs_dir, masks_dir, scale, mask_suffix='_mask')
+#class CarvanaDataset(BasicDataset):
+#    def __init__(self, imgs_dir, masks_dir, scale=1):
+#        super().__init__(imgs_dir, masks_dir, scale, mask_suffix='_mask')

@@ -14,7 +14,8 @@ from unet import UNet
 from hednet import HedNet
 from hednet import EnsembleSkeletonNet
 
-from trainer import Trainer
+#from trainer import Trainer
+from trainer_ofda import Trainer
 from training_functions import get_device
 
 def get_args():

@@ -10,7 +10,8 @@ from unet import UNet
 from hednet import HedNet
 from hednet import EnsembleSkeletonNet
 
-from trainer import Trainer
+#from trainer import Trainer
+from trainer_ofda import Trainer
 from training_functions import get_device
 
 def get_args():
@@ -68,7 +69,7 @@ if __name__=='__main__':
     
     trainer.net.load_state_dict(torch.load(checkpoint, map_location=device))
 
-    mae, mse = trainer.test(batch_size=4, printlog=True)
+    mae, mse = trainer.test(batch_size=1, printlog=True)
 
     print('MAE:', mae)
     print('MSE:', mse)

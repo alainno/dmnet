@@ -11,7 +11,8 @@ from hednet import HedNet
 from hednet import EnsembleSkeletonNet
 
 from training_functions import get_args, get_device
-from trainer import Trainer
+#from trainer import Trainer
+from trainer_ofda import Trainer
 
 
 def get_args():
@@ -20,7 +21,7 @@ def get_args():
     parser.add_argument('-l', '--loss', type=str, choices=["mae","mse",'smooth'], default="mae", help='Loss function')
     parser.add_argument('-nf', '--n_features', type=int, choices=[16,32,64], default=32, help='UNet 1st convolution features')
     parser.add_argument('-lri', '--lr_i', type=int, choices=[2,3,4,5,6], default=3, help='Learning Rate 10**i')
-    parser.add_argument('-wdi', '--wd_i', type=int, choices=[3,4,5,6], default=6, help='Loss function')
+    parser.add_argument('-wdi', '--wd_i', type=int, choices=[3,4,5,6], default=6, help='Weight decay')
     parser.add_argument('-m', '--max_epochs_without_improve', type=int, choices=range(11,20), default=15, help='Early stopping')
     parser.add_argument('-ts', '--testing_subset', type=str, choices=["synthetic","ofda"], default="synthetic", help='testing subset')
     return parser.parse_args()
@@ -67,6 +68,7 @@ if __name__ == '__main__':
                                 max_epochs_without_improve=args.max_epochs_without_improve)
 
     
+    '''
     # Test
     trainer.net.load_state_dict(torch.load(model_output_path))
     mae, mse = trainer.test(batch_size=4, printlog=False)
@@ -80,3 +82,4 @@ if __name__ == '__main__':
     with open("resultados/test2_unet_log.csv",'a') as file_log:
         #file_log.write(f'{args.loss},{args.max_epochs_without_improve},{mae},{mse},{args.testing_subset}\n')
         file_log.write(f'{args.loss},{args.max_epochs_without_improve},{args.n_features},{args.lr_i},{args.wd_i},{mae},{mse},{args.testing_subset}\n')
+    '''

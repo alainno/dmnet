@@ -12,77 +12,9 @@ from hednet import HedNet
 from hednet import EnsembleSkeletonNet
 
 from training_functions import get_args, get_device
-from trainer import Trainer
+#from trainer import Trainer
+from trainer_ofda import Trainer
 
-'''
-def get_test_loader(batch_size=2):
-    test_img_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test/images/"
-    test_gt_path = "/home/aalejo/proyectos/dmnet/datasets/synthetic/test/masks/"
-
-    trans = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.114, 0.114, 0.114],std=[0.237, 0.237, 0.237])
-    ])
-
-    test_dataset = BasicDataset(imgs_dir = test_img_path, masks_dir = test_gt_path, transforms=trans, mask_h5=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=False)
-
-    return test_loader
-
-def ensemble_test(model1, model2, batch_size=4, printlog=False):
-    if printlog:
-        print("Iniciando el testing...")
-
-    test_loader = get_test_loader(batch_size=batch_size)
-
-    if printlog:
-        print(f'{len(test_loader)} test batches of {batch_size} samples loaded')
-
-    criterion = nn.L1Loss()
-    criterion2 = nn.MSELoss()
-
-    model1.eval()
-    model2.eval()
-
-    test_loss, test_loss2 = 0, 0
-    maes, mses = 0, 0
-    
-    for batch in test_loader:
-        input, groundtruth = batch['image'], batch['mask']
-        input = input.to(device=device, dtype=torch.float32)
-        groundtruth = groundtruth.to(device=device, dtype=torch.float32)
-
-
-        with torch.no_grad():
-            output1 = model1(input)
-            output2 = model2(input)
-            
-            output = (output1 + output2) / 2
-
-            loss = criterion(output, groundtruth)
-
-            loss2 = criterion2(output, groundtruth)
-
-            mae, mse = 0, 0
-            for k in range(output.shape[0]):
-                a = output.detach().cpu().numpy()[k].squeeze()
-                b = groundtruth.detach().cpu().numpy()[k].squeeze()
-                for i in range(a.shape[0]):
-                    for j in range(a.shape[1]):
-                        mae += abs(a[i][j]-b[i][j])
-                        mse += abs(a[i][j]-b[i][j])**2
-
-            maes += mae/(input.shape[0]*256*256)
-            mses += mse/(input.shape[0]*256*256)
-
-        test_loss += loss.item()
-        test_loss2 += loss2.item()
-
-    if printlog:
-        print(test_loss/len(test_loader), test_loss2/len(test_loader), maes/len(test_loader), mses/len(test_loader))
-
-    return test_loss/len(test_loader), mses/len(test_loader)
-'''
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet and SkeletonNet on images and target masks')
@@ -114,15 +46,12 @@ if __name__ == '__main__':
     model1_output_path = f"./checkpoints/model3_snet_{args.ensemble_type}_{args.loss}.pth"
     
     if args.ensemble_type == 'outer':
-        model1 = HedNet(n_channels=3, n_classes=1, bilinear=False, side=3, n_features=32)
-        model2 = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=32)
+        model1 = HedNet(n_channels=3, n_classes=1, bilinear=False, side=3, n_features=32, use_cuda=1)
+        model2 = HedNet(n_channels=3, n_classes=1, bilinear=False, side=4, n_features=32, use_cuda=1)
         ensemble_model = EnsembleSkeletonNet(model1, model2)
     else:
         ensemble_model = HedNet(n_channels=3, n_classes=1, bilinear=False, n_features=32, use_cuda=1)
         
-
-    
-    
     
     if args.loss == 'mae':
         criterion = torch.nn.L1Loss()
@@ -167,6 +96,9 @@ if __name__ == '__main__':
     #                            scheduler=scheduler2,
     #                            model_output_path=model2_output_path)
     
+    
+    
+    '''
     # Test
     #model1.load_state_dict(torch.load(model1_output_path))
     #model2.load_state_dict(torch.load(model2_output_path))
@@ -185,3 +117,4 @@ if __name__ == '__main__':
         #file_log.write(f'{args.architecture},{args.loss},{args.n_features},{args.lr_i},{args.wd_i},{mae},{mse}\n')
         #file_log.write(f'{args.ensemble_type},{args.loss},{args.max_epochs_without_improve},{mae},{mse},{args.testing_subset}\n')
         file_log.write(f'{args.ensemble_type},{args.loss},{args.max_epochs_without_improve},{mae},{mse},{args.testing_subset}\n')
+    '''
