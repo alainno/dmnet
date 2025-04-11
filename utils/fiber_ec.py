@@ -10,7 +10,9 @@ def fiber_ec(sample_img, retornar_dibujo=False):
     # Binarizamos la imagen y obtenemos su esqueleto:
     rgb_img = cv2.imread(sample_img)
     gray_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2GRAY)
-    _,bin_img = cv2.threshold(gray_img,16,255,cv2.THRESH_BINARY)
+    gray_img = 255 - gray_img
+    # _,bin_img = cv2.threshold(gray_img,16,255,cv2.THRESH_BINARY)
+    _,bin_img = cv2.threshold(gray_img,128,255,cv2.THRESH_BINARY)
     skeleton = morphology.skeletonize(bin_img, method='lee')
     skeleton = skeleton.astype(np.uint8)
     skeleton[skeleton==1] = 255

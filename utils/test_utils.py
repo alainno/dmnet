@@ -114,7 +114,7 @@ def gt_ofda_diameter_count(img_path):
     
     img_id = os.path.splitext(os.path.basename(img_path))[0]
     
-    df = pd.read_csv(f'data/ofda/gt/{img_id}.csv',header=None)
+    df = pd.read_csv(f'datasets/ofda/gt/{img_id}.csv',header=None)
 
     diameter_count = {}
 

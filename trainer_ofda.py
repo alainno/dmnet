@@ -301,17 +301,18 @@ class Trainer:
     def test_output(self, batch_size=4, printlog=False, batch=None):
         if printlog:
             print("Iniciando el testing...")
-
-        #self.__init_test_dataset(batch_size=batch_size)
-
-        if printlog:
-            print(f'{len(self.test_data_loader)} test batches of {batch_size} samples loaded')
-
-        self.net.eval()
         
         if batch is None:
+            self.__init_test_dataset(batch_size=batch_size)
+            if printlog:
+                print(f'{len(self.test_data_loader)} test batches of {batch_size} samples loaded')
             batch = next(iter(self.test_data_loader))
 
+        self.net.eval()
+
+        # for path in batch['path']:
+        #     print(path)
+        
         inputs, groundtruth = batch['image'], batch['mask']
         inputs = inputs.to(device=self.device, dtype=torch.float32)
         #groundtruth = groundtruth.to(device=self.device, dtype=torch.float32)

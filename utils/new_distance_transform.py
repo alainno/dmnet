@@ -11,7 +11,9 @@ def new_distance_transform(sample_img):
     # Binarización de la micrografia:
     rgb_img = cv2.imread(sample_img)
     gray_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2GRAY)
-    _,bin_img = cv2.threshold(gray_img,16,255,cv2.THRESH_BINARY)
+    gray_img = 255 - gray_img
+    # _,bin_img = cv2.threshold(gray_img,16,255,cv2.THRESH_BINARY)
+    _,bin_img = cv2.threshold(gray_img,128,255,cv2.THRESH_BINARY)
     # Exqueletizamos la imagen binaria:
     skeleton = morphology.skeletonize(bin_img, method='lee')  
     # Obtenemos su mapa de distancia:
@@ -27,6 +29,11 @@ def new_distance_transform(sample_img):
 
     return diametros
 
+def neighbours(x,y,image):
+    """Return 8-neighbours of image point P1(x,y), in a clockwise order"""
+    img = image
+    x_1, y_1, x1, y1 = x-1, y-1, x+1, y+1;
+    return [ img[x_1][y], img[x_1][y1], img[x][y1], img[x1][y1], img[x1][y], img[x1][y_1], img[x][y_1], img[x_1][y_1] ]
 
 def getSkeletonIntersection(skeleton):
     """ Given a skeletonised image, it will give the coordinates of the intersections of the skeleton.
